@@ -13,6 +13,7 @@ KELVIN_TO_CELSIUS = -273.15
 # Polynomial Helper Classes and Functions
 ######################################################################
 
+
 def calc_determinant(matrix):
     m = matrix
     aei = m[0][0] * m[1][1] * m[2][2]
@@ -22,6 +23,7 @@ def calc_determinant(matrix):
     bdi = m[1][0] * m[0][1] * m[2][2]
     afh = m[0][0] * m[2][1] * m[1][2]
     return aei + bfg + cdh - ceg - bdi - afh
+
 
 class Polynomial2d:
     def __init__(self, a, b, c):
@@ -66,12 +68,12 @@ class Polynomial2d:
         sum_x3 = sum([x**3 for x in xlist])
         sum_x4 = sum([x**4 for x in xlist])
         sum_xy = sum([x * y for x, y in coords])
-        sum_x2y = sum([y*x**2 for x, y in coords])
+        sum_x2y = sum([y * x**2 for x, y in coords])
         vector_b = [sum_y, sum_xy, sum_x2y]
         m = [
             [count, sum_x, sum_x2],
             [sum_x, sum_x2, sum_x3],
-            [sum_x2, sum_x3, sum_x4]
+            [sum_x2, sum_x3, sum_x4],
         ]
         m0 = [vector_b, m[1], m[2]]
         m1 = [m[0], vector_b, m[2]]
@@ -82,31 +84,32 @@ class Polynomial2d:
         a2 = calc_determinant(m2) / det_m
         return cls(a0, a1, a2)
 
+
 class TemperatureProbe:
     def __init__(self, config):
         self.name = config.get_name()
         self.printer = config.get_printer()
         self.gcode = self.printer.lookup_object("gcode")
-        self.speed = config.getfloat("speed", None, above=0.)
+        self.speed = config.getfloat("speed", None, above=0.0)
         self.horizontal_move_z = config.getfloat(
-            "horizontal_move_z", 2., above=0.
+            "horizontal_move_z", 2.0, above=0.0
         )
-        self.resting_z = config.getfloat("resting_z", .4, above=0.)
+        self.resting_z = config.getfloat("resting_z", 0.4, above=0.0)
         self.cal_pos = config.getfloatlist(
             "calibration_position", None, count=3
         )
         self.cal_bed_temp = config.getfloat(
-            "calibration_bed_temp", None, above=50.
+            "calibration_bed_temp", None, above=50.0
         )
         self.cal_extruder_temp = config.getfloat(
-            "calibration_extruder_temp", None, above=50.
+            "calibration_extruder_temp", None, above=50.0
         )
         self.cal_extruder_z = config.getfloat(
-            "extruder_heating_z", 50., above=0.
+            "extruder_heating_z", 50.0, above=0.0
         )
         # Setup temperature sensor
-        smooth_time = config.getfloat("smooth_time", 2., above=0.)
-        self.inv_smooth_time = 1. / smooth_time
+        smooth_time = config.getfloat("smooth_time", 2.0, above=0.0)
+        self.inv_smooth_time = 1.0 / smooth_time
         self.min_temp = config.getfloat(
             "min_temp", KELVIN_TO_CELSIUS, minval=KELVIN_TO_CELSIUS
         )
@@ -118,16 +121,20 @@ class TemperatureProbe:
         self.sensor.setup_minmax(self.min_temp, self.max_temp)
         self.sensor.setup_callback(self._temp_callback)
         pheaters.register_sensor(config, self)
-        self.last_temp_read_time = 0.
-        self.last_measurement = (0., 99999999., 0.,)
+        self.last_temp_read_time = 0.0
+        self.last_measurement = (
+            0.0,
+            99999999.0,
+            0.0,
+        )
         # Calibration State
         self.cal_helper = None
-        self.next_auto_temp = 99999999.
+        self.next_auto_temp = 99999999.0
         self.target_temp = 0
         self.expected_count = 0
         self.sample_count = 0
         self.in_calibration = False
-        self.step = 2.
+        self.step = 2.0
         self.last_zero_pos = None
         self.total_expansion = 0
         self.start_pos = []
@@ -135,15 +142,19 @@ class TemperatureProbe:
         # Register GCode Commands
         pname = self.name.split(None, 1)[-1]
         self.gcode.register_mux_command(
-            "TEMPERATURE_PROBE_CALIBRATE", "PROBE", pname,
+            "TEMPERATURE_PROBE_CALIBRATE",
+            "PROBE",
+            pname,
             self.cmd_TEMPERATURE_PROBE_CALIBRATE,
-            desc=self.cmd_TEMPERATURE_PROBE_CALIBRATE_help
+            desc=self.cmd_TEMPERATURE_PROBE_CALIBRATE_help,
         )
 
         self.gcode.register_mux_command(
-            "TEMPERATURE_PROBE_ENABLE", "PROBE", pname,
+            "TEMPERATURE_PROBE_ENABLE",
+            "PROBE",
+            pname,
             self.cmd_TEMPERATURE_PROBE_ENABLE,
-            desc=self.cmd_TEMPERATURE_PROBE_ENABLE_help
+            desc=self.cmd_TEMPERATURE_PROBE_ENABLE_help,
         )
 
         # Register Drift Compensation Helper with probe
@@ -167,7 +178,7 @@ class TemperatureProbe:
         time_diff = read_time - self.last_temp_read_time
         self.last_temp_read_time = read_time
         temp_diff = temp - smoothed_temp
-        adj_time = min(time_diff * self.inv_smooth_time, 1.)
+        adj_time = min(time_diff * self.inv_smooth_time, 1.0)
         smoothed_temp += temp_diff * adj_time
         measured_min = min(measured_min, smoothed_temp)
         measured_max = max(measured_max, smoothed_temp)
@@ -180,7 +191,7 @@ class TemperatureProbe:
     def _check_kick_next(self, eventtime):
         smoothed_temp = self.last_measurement[0]
         if self.in_calibration and smoothed_temp >= self.next_auto_temp:
-            self.next_auto_temp = 99999999.
+            self.next_auto_temp = 99999999.0
             self.gcode.run_script("TEMPERATURE_PROBE_NEXT")
 
     def get_temp(self, eventtime=None):
@@ -205,8 +216,9 @@ class TemperatureProbe:
         # Register our own abort command now that the manual
         # probe has finished and unregistered
         self.gcode.register_command(
-            "ABORT", self.cmd_TEMPERATURE_PROBE_ABORT,
-            desc=self.cmd_TEMPERATURE_PROBE_ABORT_help
+            "ABORT",
+            self.cmd_TEMPERATURE_PROBE_ABORT,
+            desc=self.cmd_TEMPERATURE_PROBE_ABORT_help,
         )
         probe_speed = self._get_speeds()[1]
         # Move tool down to the resting position
@@ -256,11 +268,11 @@ class TemperatureProbe:
                 raise
 
     def _finalize_drift_cal(self, success, msg=None):
-        self.next_auto_temp = 99999999.
+        self.next_auto_temp = 99999999.0
         self.target_temp = 0
         self.expected_count = 0
         self.sample_count = 0
-        self.step = 2.
+        self.step = 2.0
         self.in_calibration = False
         self.last_zero_pos = None
         self.total_expansion = 0
@@ -294,21 +306,19 @@ class TemperatureProbe:
         toolhead = self.printer.lookup_object("toolhead")
         extr_name = toolhead.get_extruder().get_name()
         self.gcode.run_script_from_command(
-            "SET_HEATER_TEMPERATURE HEATER=%s TARGET=%f"
-            % (extr_name, temp)
+            "SET_HEATER_TEMPERATURE HEATER=%s TARGET=%f" % (extr_name, temp)
         )
         if wait:
             self.gcode.run_script_from_command(
-                "TEMPERATURE_WAIT SENSOR=%s MINIMUM=%f"
-                % (extr_name, temp)
+                "TEMPERATURE_WAIT SENSOR=%s MINIMUM=%f" % (extr_name, temp)
             )
+
     def _set_bed_temp(self, temp):
         if self.cal_bed_temp is None:
             # Bed temperature not configured
             return
         self.gcode.run_script_from_command(
-            "SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=%f"
-            % (temp,)
+            "SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=%f" % (temp,)
         )
 
     def _check_homed(self):
@@ -349,11 +359,11 @@ class TemperatureProbe:
     cmd_TEMPERATURE_PROBE_CALIBRATE_help = (
         "Calibrate probe temperature drift compensation"
     )
+
     def cmd_TEMPERATURE_PROBE_CALIBRATE(self, gcmd):
         if self.cal_helper is None:
             raise gcmd.error(
-                "No calibration helper registered for [%s]"
-                % (self.name,)
+                "No calibration helper registered for [%s]" % (self.name,)
             )
         self._check_homed()
         probe = self._get_probe()
@@ -372,25 +382,23 @@ class TemperatureProbe:
             )
         cur_temp = self.last_measurement[0]
         target_temp = gcmd.get_float("TARGET", above=cur_temp)
-        step = gcmd.get_float("STEP", 2., minval=1.0)
-        expected_count = int(
-            (target_temp - cur_temp) / step + .5
-        )
+        step = gcmd.get_float("STEP", 2.0, minval=1.0)
+        expected_count = int((target_temp - cur_temp) / step + 0.5)
         if expected_count < 3:
             raise gcmd.error(
                 "Invalid STEP and/or TARGET parameters resulted "
-                "in too few expected samples: %d"
-                % (expected_count,)
+                "in too few expected samples: %d" % (expected_count,)
             )
         try:
             self.gcode.register_command(
-                "TEMPERATURE_PROBE_NEXT", self.cmd_TEMPERATURE_PROBE_NEXT,
-                desc=self.cmd_TEMPERATURE_PROBE_NEXT_help
+                "TEMPERATURE_PROBE_NEXT",
+                self.cmd_TEMPERATURE_PROBE_NEXT,
+                desc=self.cmd_TEMPERATURE_PROBE_NEXT_help,
             )
             self.gcode.register_command(
                 "TEMPERATURE_PROBE_COMPLETE",
                 self.cmd_TEMPERATURE_PROBE_COMPLETE,
-                desc=self.cmd_TEMPERATURE_PROBE_NEXT_help
+                desc=self.cmd_TEMPERATURE_PROBE_NEXT_help,
             )
         except self.printer.config_error:
             raise gcmd.error(
@@ -417,9 +425,10 @@ class TemperatureProbe:
         )
 
     cmd_TEMPERATURE_PROBE_NEXT_help = "Sample next probe drift temperature"
+
     def cmd_TEMPERATURE_PROBE_NEXT(self, gcmd):
         manual_probe.verify_no_manual_probe(self.printer)
-        self.next_auto_temp = 99999999.
+        self.next_auto_temp = 99999999.0
         toolhead = self.printer.lookup_object("toolhead")
         # Lift and Move to nozzle back to start position
         curpos = toolhead.get_position()
@@ -439,17 +448,20 @@ class TemperatureProbe:
         )
 
     cmd_TEMPERATURE_PROBE_COMPLETE_help = "Finish Probe Drift Calibration"
+
     def cmd_TEMPERATURE_PROBE_COMPLETE(self, gcmd):
         manual_probe.verify_no_manual_probe(self.printer)
         self._finalize_drift_cal(self.sample_count >= 3)
 
     cmd_TEMPERATURE_PROBE_ABORT_help = "Abort Probe Drift Calibration"
+
     def cmd_TEMPERATURE_PROBE_ABORT(self, gcmd):
         self._finalize_drift_cal(False)
 
     cmd_TEMPERATURE_PROBE_ENABLE_help = (
         "Set adjustment factor applied to drift correction"
     )
+
     def cmd_TEMPERATURE_PROBE_ENABLE(self, gcmd):
         if self.cal_helper is not None:
             self.cal_helper.set_enabled(gcmd)
@@ -468,11 +480,11 @@ class TemperatureProbe:
             "measured_max_temp": round(measured_max, 2),
             "in_calibration": self.in_calibration,
             "estimated_expansion": self.total_expansion,
-            "compensation_enabled": dcomp_enabled
+            "compensation_enabled": dcomp_enabled,
         }
 
     def stats(self, eventtime):
-        return False, '%s: temp=%.1f' % (self.name, self.last_measurement[0])
+        return False, "%s: temp=%.1f" % (self.name, self.last_measurement[0])
 
 
 #####################################################################
@@ -483,20 +495,21 @@ class TemperatureProbe:
 
 DRIFT_SAMPLE_COUNT = 9
 
+
 class EddyDriftCompensation:
     def __init__(self, config, sensor):
         self.printer = config.get_printer()
         self.temp_sensor = sensor
         self.name = config.get_name()
-        self.cal_temp = config.getfloat("calibration_temp", 0.)
+        self.cal_temp = config.getfloat("calibration_temp", 0.0)
         self.drift_calibration = None
         self.calibration_samples = None
-        self.max_valid_temp = config.getfloat("max_validation_temp", 60.)
-        self.dc_min_temp = config.getfloat("drift_calibration_min_temp", 0.)
+        self.max_valid_temp = config.getfloat("max_validation_temp", 60.0)
+        self.dc_min_temp = config.getfloat("drift_calibration_min_temp", 0.0)
         dc = config.getlists(
-            "drift_calibration", None, seps=(',', '\n'), parser=float
+            "drift_calibration", None, seps=(",", "\n"), parser=float
         )
-        self.min_freq = 999999999999.
+        self.min_freq = 999999999999.0
         if dc is not None:
             for coefs in dc:
                 if len(coefs) != 3:
@@ -518,16 +531,14 @@ class EddyDriftCompensation:
         else:
             logging.info(
                 "%s: No drift calibration configured, disabling temperature "
-                "drift compensation"
-                % (self.name,)
+                "drift compensation" % (self.name,)
             )
         self.enabled = has_dc = self.drift_calibration is not None
         if self.cal_temp < 1e-6 and has_dc:
             self.enabled = False
             logging.info(
                 "%s: No temperature saved for eddy probe calibration, "
-                "disabling temperature drift compensation."
-                % (self.name,)
+                "disabling temperature drift compensation." % (self.name,)
             )
 
     def is_enabled(self):
@@ -553,21 +564,20 @@ class EddyDriftCompensation:
 
     def note_z_calibration_finish(self):
         self.cal_temp = (self.cal_temp + self.get_temperature()) / 2.0
-        configfile = self.printer.lookup_object('configfile')
+        configfile = self.printer.lookup_object("configfile")
         configfile.set(self.name, "calibration_temp", "%.6f " % (self.cal_temp))
         gcode = self.printer.lookup_object("gcode")
         gcode.respond_info(
             "%s: Z Calibration Temperature set to %.2f. "
             "The SAVE_CONFIG command will update the printer config "
-            "file and restart the printer."
-            % (self.name, self.cal_temp)
+            "file and restart the printer." % (self.name, self.cal_temp)
         )
 
     def collect_sample(self, mpresult, tool_zero_z, speeds):
         if self.calibration_samples is None:
             self.calibration_samples = [[] for _ in range(DRIFT_SAMPLE_COUNT)]
         move_times = []
-        temps = [0. for _ in range(DRIFT_SAMPLE_COUNT)]
+        temps = [0.0 for _ in range(DRIFT_SAMPLE_COUNT)]
         probe_samples = [[] for _ in range(DRIFT_SAMPLE_COUNT)]
         toolhead = self.printer.lookup_object("toolhead")
         cur_pos = toolhead.get_position()
@@ -589,39 +599,39 @@ class EddyDriftCompensation:
                     temps[idx] = cur_temp
                     probe_samples[idx].append(sample)
             return True
+
         sect_name = "probe_eddy_current " + self.name.split(None, 1)[-1]
         self.printer.lookup_object(sect_name).add_client(_on_bulk_data_recd)
         for i in range(DRIFT_SAMPLE_COUNT):
             if i == 0:
                 # Move down to first sample location
-                cur_pos[2] = tool_zero_z + .05
+                cur_pos[2] = tool_zero_z + 0.05
             else:
                 # Sample each .5mm in z
-                cur_pos[2] += 1.
+                cur_pos[2] += 1.0
                 toolhead.manual_move(cur_pos, lift_speed)
-                cur_pos[2] -= .5
+                cur_pos[2] -= 0.5
             toolhead.manual_move(cur_pos, probe_speed)
-            start = toolhead.get_last_move_time() + .05
-            end = start + .1
+            start = toolhead.get_last_move_time() + 0.05
+            end = start + 0.1
             move_times.append((i, start, end))
-            toolhead.dwell(.2)
+            toolhead.dwell(0.2)
         toolhead.wait_moves()
         # Wait for sample collection to finish
         reactor = self.printer.get_reactor()
         evttime = reactor.monotonic()
         while move_times:
-            evttime = reactor.pause(evttime + .1)
+            evttime = reactor.pause(evttime + 0.1)
         sample_temp = sum(temps) / len(temps)
         for i, data in enumerate(probe_samples):
             freqs = [d[1] for d in data]
             zvals = [d[2] for d in data]
             avg_freq = sum(freqs) / len(freqs)
             avg_z = sum(zvals) / len(zvals)
-            kin_z = i * .5 + .05 + mpresult.bed_z
+            kin_z = i * 0.5 + 0.05 + mpresult.bed_z
             logging.info(
                 "Probe Values at Temp %.2fC, Z %.4fmm: Avg Freq = %.6f, "
-                "Avg Measured Z = %.6f"
-                % (sample_temp, kin_z, avg_freq, avg_z)
+                "Avg Measured Z = %.6f" % (sample_temp, kin_z, avg_freq, avg_z)
             )
             self.calibration_samples[i].append((sample_temp, avg_freq))
         return sample_temp
@@ -637,28 +647,25 @@ class EddyDriftCompensation:
             return
         gcode = self.printer.lookup_object("gcode")
         if len(cal_samples) < 3:
-            raise gcode.error(
-                "calibration error, not enough samples"
-            )
+            raise gcode.error("calibration error, not enough samples")
         min_temp, _ = cal_samples[0][0]
         max_temp, _ = cal_samples[-1][0]
         polynomials = []
         for i, coords in enumerate(cal_samples):
-            height = .05 + i * .5
+            height = 0.05 + i * 0.5
             poly = Polynomial2d.fit(coords)
             polynomials.append(poly)
             logging.info("Polynomial at Z=%.2f: %s" % (height, repr(poly)))
         end_vld_temp = max(self.max_valid_temp, max_temp)
         self._check_calibration(polynomials, min_temp, end_vld_temp)
         coef_cfg = "\n" + "\n".join([str(p) for p in polynomials])
-        configfile = self.printer.lookup_object('configfile')
+        configfile = self.printer.lookup_object("configfile")
         configfile.set(self.name, "drift_calibration", coef_cfg)
         configfile.set(self.name, "drift_calibration_min_temp", min_temp)
         gcode.respond_info(
             "%s: generated %d 2D polynomials\n"
             "The SAVE_CONFIG command will update the printer config "
-            "file and restart the printer."
-            % (self.name, len(polynomials))
+            "file and restart the printer." % (self.name, len(polynomials))
         )
 
     def _check_calibration(self, calibration, start_temp, end_temp, error=None):
@@ -707,9 +714,11 @@ class EddyDriftCompensation:
                     # Frequency above max calibration value
                     err = poly(dest_temp) - low_freq
                     return freq + err
-                t = min(1., max(0., (freq - low_freq) / (high_freq - low_freq)))
+                t = min(
+                    1.0, max(0.0, (freq - low_freq) / (high_freq - low_freq))
+                )
                 low_tgt_freq = poly(dest_temp)
-                high_tgt_freq = dc[pos-1](dest_temp)
+                high_tgt_freq = dc[pos - 1](dest_temp)
                 return (1 - t) * low_tgt_freq + t * high_tgt_freq
         # Frequency below minimum, no correction
         return freq
